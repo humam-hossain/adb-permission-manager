@@ -11,7 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-from models import (
+from .models import (
     DeviceInfo,
     DeviceProfile,
     AppInfo,

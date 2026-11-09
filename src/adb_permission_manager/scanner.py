@@ -8,8 +8,8 @@ import logging
 import re
 from typing import Callable, Optional
 
-from adb_client import ADBClient
-from models import AppInfo, AppOpsInfo, AppOpsMode, PermissionInfo, PermissionState
+from .adb_client import ADBClient
+from .models import AppInfo, AppOpsInfo, AppOpsMode, PermissionInfo, PermissionState
 
 logger = logging.getLogger(__name__)
 
@@ -284,14 +284,22 @@ class PermissionScanner:
     def _parse_appops(self, package_name: str) -> list[AppOpsInfo]:
         """Parse ``appops get <package>`` output into structured data.
 
-        Handles common formats:
-        - ``COARSE_LOCATION: allow; time=...; duration=...``
-        - ``COARSE_LOCATION: allow``
-        - ``Uid mode: COARSE_LOCATION: allow``
-        - ``No operations.``
+        Handles all common output formats across Android versions:
+
+        Old format::
+
+            COARSE_LOCATION: allow; time=+15h ago; duration=+106ms
+
+        New format (Android 12+)::
+
+            COARSE_LOCATION (uid=10234): mode=ignore; time=+15h ago
+            Uid mode:
+              START_FOREGROUND (uid=10234): mode=allow; time=+2m ago
+
+        Also handles: ``No operations.``
 
         Returns:
-            A list of :class:`AppOpsInfo`.
+            A list of :class:`AppOpsInfo`, with uid-mode entries marked.
         """
         raw_output: str = self._adb.appops_get(package_name)
 
@@ -300,24 +308,40 @@ class PermissionScanner:
 
         results: list[AppOpsInfo] = []
 
-        # Pattern for the standard per-op line.
-        # Captures: OP_NAME: mode[; optional-extras]
-        # Also handles the "Uid mode:" prefix some devices emit.
+        # Regex handles both old and new formats:
+        #   OP_NAME: mode                       (old)
+        #   OP_NAME (uid=N): mode=value; ...    (new)
         op_re = re.compile(
-            r"(?:Uid\s+mode:\s*)?"  # optional "Uid mode:" prefix
-            r"(?P<name>[A-Z_]+)"  # operation name (e.g. CAMERA)
+            r"(?P<name>[A-Z][A-Z0-9_]*)"       # operation name
+            r"(?:\s*\([^)]*\))?"                # optional (uid=N) annotation
             r"\s*:\s*"
-            r"(?P<mode>\w+)"  # mode (allow / deny / ignore / default / foreground / …)
-            r"(?:\s*;\s*(?P<extras>.*))?"  # optional semicolon-separated extras
+            r"(?:mode\s*=\s*)?"                 # optional "mode=" prefix (new format)
+            r"(?P<mode>\w+)"                    # mode value
+            r"(?:\s*;\s*(?P<extras>.*))?",       # optional semicolon-separated extras
         )
 
-        duration_re = re.compile(
-            r"duration\s*=\s*\+?(?P<dur>[^\s;]+)"
-        )
+        time_re = re.compile(r"(?<!\w)time\s*=\s*\+?(?P<val>[^;]+?)(?:\s+ago)?(?:\s*;|$)")
+        reject_re = re.compile(r"rejectTime\s*=\s*\+?(?P<val>[^;]+?)(?:\s+ago)?(?:\s*;|$)")
+        duration_re = re.compile(r"duration\s*=\s*\+?(?P<val>[^\s;]+)")
+
+        in_uid_mode = False
 
         for line in raw_output.splitlines():
             stripped = line.strip()
             if not stripped:
+                continue
+
+            # Section headers
+            lower = stripped.lower()
+            if lower.startswith("uid mode"):
+                in_uid_mode = True
+                continue
+            if lower.startswith("package mode"):
+                in_uid_mode = False
+                continue
+
+            # Skip package name header lines (e.g., "com.dot.gallery:")
+            if stripped.endswith(":") and "." in stripped and " " not in stripped.rstrip(":"):
                 continue
 
             m = op_re.match(stripped)
@@ -347,13 +371,26 @@ class PermissionScanner:
             duration: Optional[str] = None
             dur_m = duration_re.search(extras)
             if dur_m:
-                duration = dur_m.group("dur")
+                duration = dur_m.group("val")
+
+            last_access: Optional[str] = None
+            time_m = time_re.search(extras)
+            if time_m:
+                last_access = time_m.group("val").strip()
+
+            last_reject: Optional[str] = None
+            rej_m = reject_re.search(extras)
+            if rej_m:
+                last_reject = rej_m.group("val").strip()
 
             results.append(
                 AppOpsInfo(
                     name=op_name,
                     mode=mode,
+                    is_uid_mode=in_uid_mode,
                     duration=duration,
+                    last_access=last_access,
+                    last_reject=last_reject,
                 )
             )
 

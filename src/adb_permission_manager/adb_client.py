@@ -12,7 +12,7 @@ import subprocess
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from models import DeviceInfo
+    from .models import DeviceInfo
 
 
 class ADBError(Exception):
@@ -224,7 +224,7 @@ class ADBClient:
 
         Queries several ``ro.*`` system properties and the device serial.
         """
-        from models import DeviceInfo  # runtime import to avoid circular deps
+        from .models import DeviceInfo  # runtime import to avoid circular deps
 
         model = self.get_prop("ro.product.model")
         brand = self.get_prop("ro.product.brand")

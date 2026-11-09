@@ -110,7 +110,10 @@ class AppOpsInfo:
 
     name: str
     mode: AppOpsMode
+    is_uid_mode: bool = False
     duration: Optional[str] = None
+    last_access: Optional[str] = None
+    last_reject: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -246,8 +249,14 @@ def _permission_from_dict(d: dict) -> PermissionInfo:
 
 def _appops_to_dict(o: AppOpsInfo) -> dict:
     result: dict = {"name": o.name, "mode": o.mode.value}
+    if o.is_uid_mode:
+        result["is_uid_mode"] = True
     if o.duration is not None:
         result["duration"] = o.duration
+    if o.last_access is not None:
+        result["last_access"] = o.last_access
+    if o.last_reject is not None:
+        result["last_reject"] = o.last_reject
     return result
 
 
@@ -255,7 +264,10 @@ def _appops_from_dict(d: dict) -> AppOpsInfo:
     return AppOpsInfo(
         name=d["name"],
         mode=AppOpsMode(d["mode"]),
+        is_uid_mode=d.get("is_uid_mode", False),
         duration=d.get("duration"),
+        last_access=d.get("last_access"),
+        last_reject=d.get("last_reject"),
     )
 
 

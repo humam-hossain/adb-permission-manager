@@ -7,8 +7,8 @@ using pm grant/revoke with appops fallback when pm commands fail.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from models import PermissionChange, PermissionState, AppOpsMode
-from adb_client import ADBClient
+from .models import PermissionChange, PermissionState, AppOpsMode
+from .adb_client import ADBClient
 
 
 @dataclass
@@ -53,6 +53,8 @@ class PermissionApplier:
             "android.permission.WRITE_EXTERNAL_STORAGE": "WRITE_EXTERNAL_STORAGE",
             "android.permission.BODY_SENSORS": "BODY_SENSORS",
             "android.permission.POST_NOTIFICATIONS": "POST_NOTIFICATIONS",
+            # Network — controllable via AppOps on LineageOS and some ROMs
+            "android.permission.INTERNET": "INTERNET",
         }
 
     def apply_changes(

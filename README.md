@@ -20,15 +20,38 @@ Interactive terminal tool for managing Android app permissions across any device
 
 ## Install
 
+### With uv (recommended)
+
 ```bash
 cd adb-permission-manager
-pip install -r requirements.txt
+uv sync
+```
+
+### With pip
+
+```bash
+cd adb-permission-manager
+pip install .
 ```
 
 ## Usage
 
+### With uv
+
 ```bash
-python perm_manager.py
+uv run adb-perms
+```
+
+### With pip install
+
+```bash
+adb-perms
+```
+
+### Direct script (development)
+
+```bash
+uv run python -m adb_permission_manager.perm_manager
 ```
 
 ### Workflow
@@ -64,12 +87,15 @@ You can:
 ## Architecture
 
 ```
-perm_manager.py    — Main entry point + interactive TUI
-adb_client.py      — ADB command wrapper (subprocess)
-scanner.py         — Device scanner (dumpsys + appops parser)
-profile.py         — Profile save/load/diff/import/export
-applier.py         — Permission applier (pm + appops fallback)
-models.py          — Data classes and enums
+pyproject.toml                             — Project metadata & dependencies
+src/adb_permission_manager/
+  ├── __init__.py                          — Package init
+  ├── perm_manager.py                      — Main entry point + interactive TUI
+  ├── adb_client.py                        — ADB command wrapper (subprocess)
+  ├── scanner.py                           — Device scanner (dumpsys + appops parser)
+  ├── profile.py                           — Profile save/load/diff/import/export
+  ├── applier.py                           — Permission applier (pm + appops fallback)
+  └── models.py                            — Data classes and enums
 ```
 
 ## Limitations
